@@ -55,8 +55,10 @@ public class MainActivity extends AppCompatActivity {
         }
         mAdapter=new GoodsAdapter(this,mivGoodsList);
         mvpGoods= (ViewPager) findViewById(R.id.vpGoods);
+        // ViewPager's onMeasure and onLayout method is called after setAdapter
         mvpGoods.setAdapter(mAdapter);
     }
+    
   	// prepare adapter class
     class GoodsAdapter extends PagerAdapter {
         Context context;
@@ -98,6 +100,7 @@ public class MainActivity extends AppCompatActivity {
 
 ```java
 266     public void More ...setAdapter(PagerAdapter adapter) {
+			// 第一次调用setAdapter，mAdapter为空
 267         if (mAdapter != null) {
 				// added by lby:clear Observer
 268             mAdapter.setDataSetObserver(null);
@@ -128,7 +131,7 @@ public class MainActivity extends AppCompatActivity {
 				//**added by lby:add observer
 287             mAdapter.setDataSetObserver(mObserver);
 288             mPopulatePending = false;
-				//**added by lby: default mRestoredCurItem value is -1,unless onRestoreInstanceState is called
+				
 289             if (mRestoredCurItem >= 0) {
 290                 mAdapter.restoreState(mRestoredAdapterState, mRestoredClassLoader);
 291                 setCurrentItemInternal(mRestoredCurItem, false, true);
@@ -136,7 +139,7 @@ public class MainActivity extends AppCompatActivity {
 293                 mRestoredAdapterState = null;
 294                 mRestoredClassLoader = null;
 295             } else {
-					// default execution stream
+					// tested On API 24 platform, the function was not called for the first time when setAdapter is called.
 296                 populate();
 297             }
 298         }
@@ -347,6 +350,7 @@ member variables, mMeasuredWidth and mMeasuredHeight, as the SpecSize value.(Mea
 899     @Override
 900     protected void More ...onLayout(boolean changed, int l, int t, int r, int b) {
 901         mInLayout = true;
+			// This function package all child view to mItems
 902         populate();
 903         mInLayout = false;
 904 
@@ -363,6 +367,7 @@ member variables, mMeasuredWidth and mMeasuredHeight, as the SpecSize value.(Mea
 915                 if (DEBUG) Log.v(TAG, "Positioning #" + i + " " + child + " f=" + ii.object
 916 		        + ":" + childLeft + "," + childTop + " " + child.getMeasuredWidth()
 917 		        + "x" + child.getMeasuredHeight());
+					// layout all child from left to right
 918                 child.layout(childLeft, childTop,
 919                         childLeft + child.getMeasuredWidth(),
 920                         childTop + child.getMeasuredHeight());
@@ -371,6 +376,8 @@ member variables, mMeasuredWidth and mMeasuredHeight, as the SpecSize value.(Mea
 923         mFirstLayout = false;
 924     }
 
+
+		//**added by lby:get ItemInfo from View
 806     ItemInfo More ...infoForChild(View child) {
 807         for (int i=0; i<mItems.size(); i++) {
 808             ItemInfo ii = mItems.get(i);
