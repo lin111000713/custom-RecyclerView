@@ -5,7 +5,7 @@
 
 1.准备布局文件
 
-```java
+```xml
 
 <?xml version="1.0" encoding="utf-8"?>
 <RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
@@ -22,11 +22,9 @@
 ```
 
 
-
 2.准备数据源
 
 3.填充适配器
-
 
 ```java
 public class MainActivity extends AppCompatActivity {
@@ -99,11 +97,28 @@ public class MainActivity extends AppCompatActivity {
 ```
 
 # 二、源码分析：查看早期的ViewPager源码,代码量较少，能较快熟悉实现机制[4.0.1_r1](http://grepcode.com/file/repository.grepcode.com/java/ext/com.google.android/android/4.0.1_r1/android/support/v4/view/ViewPager.java#ViewPager).
-## 0、入口函数
+## 1、核心数据
+	```java
+			// Core data structure for every page
+	67      static class ItemInfo {
+				//object为PagerAdapter的instantiateItem函数返回的对象
+	68          Object object;
+				//position为页面的序号，即第几个页面
+	69          int position;
+				//是否正在滚动
+	70          boolean scrolling;
+	71      }
+	
+	```
+参考博客链接：[ViewPager源码分析：与PagerAdapter 交互](http://www.jianshu.com/p/204efa98a18d)
+來源：简书
+
+
+## 2、入口函数
 
 ```java
-266     public void More ...setAdapter(PagerAdapter adapter) {
-			// 第一次调用setAdapter，mAdapter为空
+266     public void setAdapter(PagerAdapter adapter) {
+			// ignore it!
 267         if (mAdapter != null) {
 				// added by lby:clear Observer
 268             mAdapter.setDataSetObserver(null);
@@ -134,7 +149,7 @@ public class MainActivity extends AppCompatActivity {
 				//**added by lby:add observer
 287             mAdapter.setDataSetObserver(mObserver);
 288             mPopulatePending = false;
-				
+				// if we have datas to restore
 289             if (mRestoredCurItem >= 0) {
 290                 mAdapter.restoreState(mRestoredAdapterState, mRestoredClassLoader);
 291                 setCurrentItemInternal(mRestoredCurItem, false, true);
@@ -142,7 +157,7 @@ public class MainActivity extends AppCompatActivity {
 293                 mRestoredAdapterState = null;
 294                 mRestoredClassLoader = null;
 295             } else {
-					// tested On API 24 platform, the function was not called for the first time when setAdapter is called.
+					// Tested On API 24 platform, the function was not called for the first time when setAdapter is called.But it is called in this version of sdk
 296                 populate();
 297             }
 298         }
@@ -151,8 +166,7 @@ public class MainActivity extends AppCompatActivity {
 
 由于ViewPager并不是将所有页面作为子View，而是最多缓存用户指定缓存个数*2（左右两边，可能左边或右边没有那么多页面）因此需要创建和销毁页面，populate主要工作就是这些		
 
-607     void More ...populate() {
-
+607     void populate() {
 611 
 612         // Bail now if we are waiting to populate.  This is to hold off
 613         // on creating views from the time the user releases their finger to
@@ -171,18 +185,21 @@ public class MainActivity extends AppCompatActivity {
 626         }
 627 
 628         mAdapter.startUpdate(this);
-629 
+629 		// **added by lby:default value is 1-->to cache a page for left and right
 630         final int pageLimit = mOffscreenPageLimit;
+			// ** added by lby:// mCurItem: Index of currently displayed page.
+			// ** added by lby:Index of the first page
 631         final int startPos = Math.max(0, mCurItem - pageLimit);
 632         final int N = mAdapter.getCount();
+			// ** added by lby:Index of the last page
 633         final int endPos = Math.min(N-1, mCurItem + pageLimit);
 634 
-635         if (DEBUG) Log.v(TAG, "populating: startPos=" + startPos + " endPos=" + endPos);
 636 
-637         // Add and remove pages in the existing list.
+637         // 1.Add and remove pages in the existing list.
 638         int lastPos = -1;
 639         for (int i=0; i<mItems.size(); i++) {
 640             ItemInfo ii = mItems.get(i);
+				//** added by lby:remove all items where index is not between startPos and endPos
 641             if ((ii.position < startPos || ii.position > endPos) && !ii.scrolling) {
 642                 if (DEBUG) Log.i(TAG, "removing: " + ii.position + " @ " + i);
 643                 mItems.remove(i);
@@ -206,7 +223,7 @@ public class MainActivity extends AppCompatActivity {
 661             lastPos = ii.position;
 662         }
 663 
-664         // Add any new pages we need at the end.
+664         // 2.Add any new pages we need at the end.
 665         lastPos = mItems.size() > 0 ? mItems.get(mItems.size()-1).position : -1;
 666         if (lastPos < endPos) {
 667             lastPos++;
@@ -225,6 +242,7 @@ public class MainActivity extends AppCompatActivity {
 680             }
 681         }
 682 
+			//** added by lby:get current item
 683         ItemInfo curItem = null;
 684         for (int i=0; i<mItems.size(); i++) {
 685             if (mItems.get(i).position == mCurItem) {
@@ -252,31 +270,50 @@ public class MainActivity extends AppCompatActivity {
 707             }
 708         }
 709     }
+
+		/*
+		 * 1.add ItemInfo to mItems
+		 * 2.add View corresponding it's ItemInfo to ViewPager
+		 */
+545     void addNewItem(int position, int index) {
+546         ItemInfo ii = new ItemInfo();
+547         ii.position = position;
+			//** added by lby:add child View to it's parent view(ViewPager)
+548         ii.object = mAdapter.instantiateItem(this, position);
+549         if (index < 0) {
+550             mItems.add(ii);
+551         } else {
+552             mItems.add(index, ii);
+553         }
+554     }
+
+Summary:when setAdapter is called, populate is called at the first time.
+	at this time:mItems.size is equal 2
+		--->mItems.get(0):addNewItem(0, -1);   [position=0]
+		--->mItems.get(1):addNewItem(1, -1);	[position=1]
   
 ```
 
-
-
-## 1.构造函数
+## 3.构造函数
 
 ```java
-
-227     public More ...ViewPager(Context context) {
+227     public ViewPager(Context context) {
 228         super(context);
 229         initViewPager();
 230     }
 231 
-232     public More ...ViewPager(Context context, AttributeSet attrs) {
+232     public ViewPager(Context context, AttributeSet attrs) {
 233         super(context, attrs);
 234         initViewPager();
 235     }
 236 
-237     void More ...initViewPager() {
+237     void initViewPager() {
 			// **added by lby: When ViewGroup calls invadilate, onDraw will be called
 238         setWillNotDraw(false);
 239         setDescendantFocusability(FOCUS_AFTER_DESCENDANTS);
 240         setFocusable(true);
 241         final Context context = getContext();
+			// init Scroller for ViewPager's slidding
 242         mScroller = new Scroller(context, sInterpolator);
 243         final ViewConfiguration configuration = ViewConfiguration.get(context);
 244         mTouchSlop = ViewConfigurationCompat.getScaledPagingTouchSlop(configuration);
@@ -290,7 +327,7 @@ public class MainActivity extends AppCompatActivity {
 252         mFlingVelocityInfluence = 0.4f;
 253     }
 254 
-255     private void More ...setScrollState(int newState) {
+255     private void setScrollState(int newState) {
 256         if (mScrollState == newState) {
 257             return;
 258         }
@@ -307,7 +344,7 @@ public class MainActivity extends AppCompatActivity {
 ```java
  
 833     @Override
-834     protected void More ...onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
+834     protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
 835         // For simple implementation, or internal size is always 0.
 836         // We depend on the container to specify the layout size of
 837         // our view.  We can't really know what it is since we will be
@@ -331,9 +368,7 @@ public class MainActivity extends AppCompatActivity {
 855         final int size = getChildCount();
 856         for (int i = 0; i < size; ++i) {
 857             final View child = getChildAt(i);
-858             if (child.getVisibility() != GONE) {
-859                 if (DEBUG) Log.v(TAG, "Measuring #" + i + " " + child
-860 		        + ": " + mChildWidthMeasureSpec);
+858             if (child.getVisibility() != GONE) {          
 					// **added by lby: because child's SpecMode is set as MeasureSpec.EXACTLY, default onMeasure implementation set 
 member variables, mMeasuredWidth and mMeasuredHeight, as the SpecSize value.(MeasureSpec=SpecMode+SpecSize)  
 861                 child.measure(mChildWidthMeasureSpec, mChildHeightMeasureSpec);
@@ -345,15 +380,12 @@ member variables, mMeasuredWidth and mMeasuredHeight, as the SpecSize value.(Mea
  1、use default measure function to measure itself.
  2.measure all child elements:the main purpose of the onMeasure function is to enable all child to fill the parent (minus padding).
  
- 
   ```
-  
   
   ```java
 899     @Override
-900     protected void More ...onLayout(boolean changed, int l, int t, int r, int b) {
+900     protected void onLayout(boolean changed, int l, int t, int r, int b) {
 901         mInLayout = true;
-			// This function package all child view to mItems
 902         populate();
 903         mInLayout = false;
 904 
@@ -364,7 +396,7 @@ member variables, mMeasuredWidth and mMeasuredHeight, as the SpecSize value.(Mea
 909             View child = getChildAt(i);
 910             ItemInfo ii;
 911             if (child.getVisibility() != GONE && (ii=infoForChild(child)) != null) {
-912                 int loff = (width + mPageMargin) * ii.position;
+912                 int loff = (width + mPageMargin) * ii.position; // mPageMargin default value is 0
 913                 int childLeft = getPaddingLeft() + loff;
 914                 int childTop = getPaddingTop();
 915                 if (DEBUG) Log.v(TAG, "Positioning #" + i + " " + child + " f=" + ii.object
@@ -381,7 +413,7 @@ member variables, mMeasuredWidth and mMeasuredHeight, as the SpecSize value.(Mea
 
 
 		//**added by lby:get ItemInfo from View
-806     ItemInfo More ...infoForChild(View child) {
+806     ItemInfo infoForChild(View child) {
 807         for (int i=0; i<mItems.size(); i++) {
 808             ItemInfo ii = mItems.get(i);
 809             if (mAdapter.isViewFromObject(child, ii.object)) {
@@ -391,7 +423,7 @@ member variables, mMeasuredWidth and mMeasuredHeight, as the SpecSize value.(Mea
 813         return null;
 814     }
 815 
-816     ItemInfo More ...infoForAnyChild(View child) {
+816     ItemInfo infoForAnyChild(View child) {
 817         ViewParent parent;
 818         while ((parent=child.getParent()) != this) {
 819             if (parent == null || !(parent instanceof View)) {
@@ -401,14 +433,12 @@ member variables, mMeasuredWidth and mMeasuredHeight, as the SpecSize value.(Mea
 823         }
 824         return infoForChild(child);
 825     }
-
   
 ```
 
-## 
-
-
-
-
+总结：
+初始化的时候调用过程
+1.setAdapter-->populate   	结果：产生下标为0和1的两个item
+2.onMeasure-->onLayout  	结果：下标为0和1的两个item被测量和布局，测量后的大小为父布局的宽高（除了padding外），布局后为屏幕第一屏和右边第二屏
 
 
