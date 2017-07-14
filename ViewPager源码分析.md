@@ -103,7 +103,7 @@ public class MainActivity extends AppCompatActivity {
 	67      static class ItemInfo {
 				//object为PagerAdapter的instantiateItem函数返回的对象
 	68          Object object;
-				//position为页面的序号，即第几个页面
+				//position为页面的序号，即第几个页面--对应Object的页面下标
 	69          int position;
 				//是否正在滚动
 	70          boolean scrolling;
@@ -114,7 +114,7 @@ public class MainActivity extends AppCompatActivity {
 來源：简书
 
 
-## 2、入口函数
+## 2、入口函数1: setAdapter
 
 ```java
 266     public void setAdapter(PagerAdapter adapter) {
@@ -199,16 +199,18 @@ public class MainActivity extends AppCompatActivity {
 638         int lastPos = -1;
 639         for (int i=0; i<mItems.size(); i++) {
 640             ItemInfo ii = mItems.get(i);
-				//** added by lby:remove all items where index is not between startPos and endPos
+				//** added by lby:remove all items where index is not between startPos and endPos while ViewPager is not scrolling
 641             if ((ii.position < startPos || ii.position > endPos) && !ii.scrolling) {
 642                 if (DEBUG) Log.i(TAG, "removing: " + ii.position + " @ " + i);
 643                 mItems.remove(i);
 644                 i--;
 645                 mAdapter.destroyItem(this, ii.position, ii.object);
-646             } else if (lastPos < endPos && ii.position > startPos) {
+646             } 
+				// The following piece of code can't be understood.
+				else if (lastPos < endPos && ii.position > startPos) {
 647                 // The next item is outside of our range, but we have a gap
 648                 // between it and the last item where we want to have a page
-649                 // shown.  Fill in the gap.
+649                 // shown.  Fill in the gap.  希望有一个item去填充空白
 650                 lastPos++;
 651                 if (lastPos < startPos) {
 652                     lastPos = startPos;
@@ -272,6 +274,153 @@ public class MainActivity extends AppCompatActivity {
 709     }
 
 		/*
+		 	SDK version:4.1.1_r1
+		 */
+775     void populate(int newCurrentItem) {
+776         ItemInfo oldCurInfo = null;
+777         if (mCurItem != newCurrentItem) {
+778             oldCurInfo = infoForPosition(mCurItem);
+779             mCurItem = newCurrentItem;
+780         }
+781 
+			...
+801 
+802         mAdapter.startUpdate(this);
+803 
+804         final int pageLimit = mOffscreenPageLimit;
+805         final int startPos = Math.max(0, mCurItem - pageLimit);
+806         final int N = mAdapter.getCount();
+807         final int endPos = Math.min(N-1, mCurItem + pageLimit);
+808 
+809         // Locate the currently focused item or add it if needed.
+810         int curIndex = -1;
+811         ItemInfo curItem = null;
+812         for (curIndex = 0; curIndex < mItems.size(); curIndex++) {
+813             final ItemInfo ii = mItems.get(curIndex);
+814             if (ii.position >= mCurItem) {
+815                 if (ii.position == mCurItem) curItem = ii;
+816                 break;
+817             }
+818         }
+819 
+			//** added by lby:add current item to last position of mItems
+820         if (curItem == null && N > 0) {
+821             curItem = addNewItem(mCurItem, curIndex);
+822         }
+823 
+824         // Fill 3x the available width or up to the number of offscreen
+825         // pages requested to either side, whichever is larger.
+826         // If we have no current item we have no work to do.
+			//** added by lby:Caches the page on the left side of the selected page
+827         if (curItem != null) {
+828             float extraWidthLeft = 0.f;
+829             int itemIndex = curIndex - 1;
+830             ItemInfo ii = itemIndex >= 0 ? mItems.get(itemIndex) : null;
+831             final float leftWidthNeeded = 2.f - curItem.widthFactor;
+832             for (int pos = mCurItem - 1; pos >= 0; pos--) {
+					//** added by lby: If the width on the left exceeds the required width and the current page position is smaller than the first cached page, this page needs Destroy
+833                 if (extraWidthLeft >= leftWidthNeeded && pos < startPos) {
+834                     if (ii == null) {
+835                         break;
+836                     }
+
+						//** added by lby: destroy current page
+837                     if (pos == ii.position && !ii.scrolling) {
+838                         mItems.remove(itemIndex);
+839                         mAdapter.destroyItem(this, pos, ii.object);
+840                         itemIndex--;
+841                         curIndex--;
+842                         ii = itemIndex >= 0 ? mItems.get(itemIndex) : null;
+843                     }
+844                 } else if (ii != null && pos == ii.position) {
+						//** added by lby:If the current location is in need to cache, and the page on this location already exists, then the left page's extraWidthLeft plus the current widthFactor
+845                     extraWidthLeft += ii.widthFactor;
+846                     itemIndex--;
+847                     ii = itemIndex >= 0 ? mItems.get(itemIndex) : null;
+848                 } else {
+						// If the current location is to be cached, and there is no page in this position, then 
+you need to add a ItemInfo to ItemInfo list.
+849                     ii = addNewItem(pos, itemIndex + 1);
+850                     extraWidthLeft += ii.widthFactor;
+851                     curIndex++;
+852                     ii = itemIndex >= 0 ? mItems.get(itemIndex) : null;
+853                 }
+854             }
+855 
+				//** added by lby:Caches the page on the right side of the selected page.The principle is similar to the above
+856             float extraWidthRight = curItem.widthFactor;
+857             itemIndex = curIndex + 1;
+858             if (extraWidthRight < 2.f) {
+859                 ii = itemIndex < mItems.size() ? mItems.get(itemIndex) : null;
+860                 for (int pos = mCurItem + 1; pos < N; pos++) {
+861                     if (extraWidthRight >= 2.f && pos > endPos) {
+862                         if (ii == null) {
+863                             break;
+864                         }
+865                         if (pos == ii.position && !ii.scrolling) {
+866                             mItems.remove(itemIndex);
+867                             mAdapter.destroyItem(this, pos, ii.object);
+868                             ii = itemIndex < mItems.size() ? mItems.get(itemIndex) : null;
+869                         }
+870                     } else if (ii != null && pos == ii.position) {
+871                         extraWidthRight += ii.widthFactor;
+872                         itemIndex++;
+873                         ii = itemIndex < mItems.size() ? mItems.get(itemIndex) : null;
+874                     } else {
+875                         ii = addNewItem(pos, itemIndex);
+876                         itemIndex++;
+877                         extraWidthRight += ii.widthFactor;
+878                         ii = itemIndex < mItems.size() ? mItems.get(itemIndex) : null;
+879                     }
+880                 }
+881             }
+882 
+883             calculatePageOffsets(curItem, curIndex, oldCurInfo);
+884         }
+885 
+886         if (DEBUG) {
+887             Log.i(TAG, "Current page list:");
+888             for (int i=0; i<mItems.size(); i++) {
+889                 Log.i(TAG, "#" + i + ": page " + mItems.get(i).position);
+890             }
+891         }
+892 
+893         mAdapter.setPrimaryItem(this, mCurItem, curItem != null ? curItem.object : null);
+894 
+895         mAdapter.finishUpdate(this);
+896 
+897         // Check width measurement of current pages. Update LayoutParams as needed.
+898         final int childCount = getChildCount();
+899         for (int i = 0; i < childCount; i++) {
+900             final View child = getChildAt(i);
+901             final LayoutParams lp = (LayoutParams) child.getLayoutParams();
+902             if (!lp.isDecor && lp.widthFactor == 0.f) {
+903                 // 0 means requery the adapter for this, it doesn't have a valid width.
+904                 final ItemInfo ii = infoForChild(child);
+905                 if (ii != null) {
+906                     lp.widthFactor = ii.widthFactor;
+907                 }
+908             }
+909         }
+910 
+911         if (hasFocus()) {
+912             View currentFocused = findFocus();
+913             ItemInfo ii = currentFocused != null ? infoForAnyChild(currentFocused) : null;
+914             if (ii == null || ii.position != mCurItem) {
+915                 for (int i=0; i<getChildCount(); i++) {
+916                     View child = getChildAt(i);
+917                     ii = infoForChild(child);
+918                     if (ii != null && ii.position == mCurItem) {
+919                         if (child.requestFocus(FOCUS_FORWARD)) {
+920                             break;
+921                         }
+922                     }
+923                 }
+924             }
+925         }
+926     }
+
+		/*
 		 * 1.add ItemInfo to mItems
 		 * 2.add View corresponding it's ItemInfo to ViewPager
 		 */
@@ -291,6 +440,46 @@ Summary:when setAdapter is called, populate is called at the first time.
 	at this time:mItems.size is equal 2
 		--->mItems.get(0):addNewItem(0, -1);   [position=0]
 		--->mItems.get(1):addNewItem(1, -1);	[position=1]
+		
+总结：
+假设当前的ViewPager维护5个Pager，刚开始的时候选择下标为0的pager，然后选中下标为4的pager（setCurrentItem）.Item从0变到4的过程：
+1.当下标从0-->4滚动的过程中，维护的数据链表：mItems（维护四个数据项）
+		mItems = {ArrayList@4681}  size = 4
+			 0 = {ViewPager$ItemInfo@4713} 
+			  object = {ImageView@4717} "android.widget.ImageView{ba43fb8 V.ED..... ........ 0,0-1080,600}"
+			  offset = 0.0
+			  position = 0		// 第一个Pager
+			  scrolling = true
+			  widthFactor = 1.0
+			  shadow$_klass_ = {Class@4585} "class android.support.v4.view.ViewPager$ItemInfo"
+			  shadow$_monitor_ = -1923628340
+			 1 = {ViewPager$ItemInfo@4714} 
+			  object = {ImageView@4720} "android.widget.ImageView{dc854f7 V.ED..... ......ID 1080,0-2160,600}"
+			  offset = 1.0
+			  position = 1		// 第二个Pager
+			  scrolling = true
+			  widthFactor = 1.0
+			  shadow$_klass_ = {Class@4585} "class android.support.v4.view.ViewPager$ItemInfo"
+			  shadow$_monitor_ = -2122299115
+			 2 = {ViewPager$ItemInfo@4715} 
+			  object = {ImageView@4723} "android.widget.ImageView{a89e82 V.ED..... ......ID 0,0-0,0}"
+			  offset = 3.0
+			  position = 3		// 第四个Pager
+			  scrolling = false
+			  widthFactor = 1.0
+			  shadow$_klass_ = {Class@4585} "class android.support.v4.view.ViewPager$ItemInfo"
+			  shadow$_monitor_ = -2061388758
+			 3 = {ViewPager$ItemInfo@4716} 
+			  object = {ImageView@4726} "android.widget.ImageView{81db1c9 V.ED..... ......ID 0,0-0,0}"
+			  offset = 4.0
+			  position = 4		// 第五个Pager
+			  scrolling = false
+			  widthFactor = 1.0
+			  shadow$_klass_ = {Class@4585} "class android.support.v4.view.ViewPager$ItemInfo"
+			  shadow$_monitor_ = -2034585061
+2.将步骤1的四个数据项，根据Item数据中的position，将每个Pager布局到0，1，3，4位置
+3.根据mItems的四个数据项重新布局，然后滚动4个屏幕的距离，当前选中的位置从0变到4
+4.清理掉mItems链表中的0和1两个page对应的数据项，此时mItems中的数据项仅剩下两个元素（position=3和position=4两项）
   
 ```
 
@@ -440,5 +629,67 @@ member variables, mMeasuredWidth and mMeasuredHeight, as the SpecSize value.(Mea
 初始化的时候调用过程
 1.setAdapter-->populate   	结果：产生下标为0和1的两个item
 2.onMeasure-->onLayout  	结果：下标为0和1的两个item被测量和布局，测量后的大小为父布局的宽高（除了padding外），布局后为屏幕第一屏和右边第二屏
+
+## 4. 入口2：setCurrentItem
+
+```java
+420     public void setCurrentItem(int item) {
+421         mPopulatePending = false;
+422         setCurrentItemInternal(item, !mFirstLayout, false);
+423     }
+
+430 
+431     public void More ...setCurrentItem(int item, boolean smoothScroll) {
+432         mPopulatePending = false;
+433         setCurrentItemInternal(item, smoothScroll, false);
+434     }
+439 
+440     void More ...setCurrentItemInternal(int item, boolean smoothScroll, boolean always) {
+441         setCurrentItemInternal(item, smoothScroll, always, 0);
+442     }
+443 
+444     void More ...setCurrentItemInternal(int item, boolean smoothScroll, boolean always, int velocity) {
+			...
+			
+459         final int pageLimit = mOffscreenPageLimit;
+460         if (item > (mCurItem + pageLimit) || item < (mCurItem - pageLimit)) {
+461             // We are doing a jump by more than one page.  To avoid
+462             // glitches, we want to keep all current pages in the view
+463             // until the scroll ends.
+464             for (int i=0; i<mItems.size(); i++) {
+465                 mItems.get(i).scrolling = true;
+466             }
+467         }
+468         final boolean dispatchSelected = mCurItem != item;
+			// re
+469         populate(item);
+470         final ItemInfo curInfo = infoForPosition(item);
+471         int destX = 0;
+472         if (curInfo != null) {
+473             final int width = getWidth();
+474             destX = (int) (width * Math.max(mFirstOffset,
+475                     Math.min(curInfo.offset, mLastOffset)));
+476         }
+477         if (smoothScroll) {
+478             smoothScrollTo(destX, 0, velocity);
+479             if (dispatchSelected && mOnPageChangeListener != null) {
+480                 mOnPageChangeListener.onPageSelected(item);
+481             }
+482             if (dispatchSelected && mInternalPageChangeListener != null) {
+483                 mInternalPageChangeListener.onPageSelected(item);
+484             }
+485         } else {
+486             if (dispatchSelected && mOnPageChangeListener != null) {
+487                 mOnPageChangeListener.onPageSelected(item);
+488             }
+489             if (dispatchSelected && mInternalPageChangeListener != null) {
+490                 mInternalPageChangeListener.onPageSelected(item);
+491             }
+492             completeScroll();
+493             scrollTo(destX, 0);
+494         }
+495     }
+
+```
 
 
