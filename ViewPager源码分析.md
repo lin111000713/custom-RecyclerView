@@ -651,6 +651,7 @@ member variables, mMeasuredWidth and mMeasuredHeight, as the SpecSize value.(Mea
 494         }
 495     }
 
+```
 
 总结：
 
@@ -695,8 +696,5 @@ member variables, mMeasuredWidth and mMeasuredHeight, as the SpecSize value.(Mea
 3.根据mItems的四个数据项重新布局，然后滚动4个屏幕的距离，当前选中的位置从0变到4
 4.清理掉mItems链表中的0和1两个page对应的数据项，此时mItems中的数据项仅剩下两个元素（position=3和position=4两项）
 
-
-
-```
 
 
