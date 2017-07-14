@@ -657,6 +657,7 @@ member variables, mMeasuredWidth and mMeasuredHeight, as the SpecSize value.(Mea
 
 ![布局变化](https://github.com/lin111000713/custom-RecyclerView/blob/master/%E5%8F%98%E5%8C%96%E8%BF%87%E7%A8%8B.png)
 
+```java
 假设当前的ViewPager维护5个Pager，刚开始的时候选择下标为0的pager，然后选中下标为4的pager（setCurrentItem）.Item从0变到4的过程：
 1.当下标从0-->4滚动的过程中，维护的数据链表：mItems（维护四个数据项）
 		mItems = {ArrayList@4681}  size = 4
@@ -695,6 +696,7 @@ member variables, mMeasuredWidth and mMeasuredHeight, as the SpecSize value.(Mea
 2.将步骤1的四个数据项，根据Item数据中的position，将每个Pager布局到0，1，3，4位置
 3.根据mItems的四个数据项重新布局，然后滚动4个屏幕的距离，当前选中的位置从0变到4
 4.清理掉mItems链表中的0和1两个page对应的数据项，此时mItems中的数据项仅剩下两个元素（position=3和position=4两项）
+```
 
 
 
