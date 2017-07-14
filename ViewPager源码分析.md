@@ -441,45 +441,6 @@ Summary:when setAdapter is called, populate is called at the first time.
 		--->mItems.get(0):addNewItem(0, -1);   [position=0]
 		--->mItems.get(1):addNewItem(1, -1);	[position=1]
 		
-总结：
-假设当前的ViewPager维护5个Pager，刚开始的时候选择下标为0的pager，然后选中下标为4的pager（setCurrentItem）.Item从0变到4的过程：
-1.当下标从0-->4滚动的过程中，维护的数据链表：mItems（维护四个数据项）
-		mItems = {ArrayList@4681}  size = 4
-			 0 = {ViewPager$ItemInfo@4713} 
-			  object = {ImageView@4717} "android.widget.ImageView{ba43fb8 V.ED..... ........ 0,0-1080,600}"
-			  offset = 0.0
-			  position = 0		// 第一个Pager
-			  scrolling = true
-			  widthFactor = 1.0
-			  shadow$_klass_ = {Class@4585} "class android.support.v4.view.ViewPager$ItemInfo"
-			  shadow$_monitor_ = -1923628340
-			 1 = {ViewPager$ItemInfo@4714} 
-			  object = {ImageView@4720} "android.widget.ImageView{dc854f7 V.ED..... ......ID 1080,0-2160,600}"
-			  offset = 1.0
-			  position = 1		// 第二个Pager
-			  scrolling = true
-			  widthFactor = 1.0
-			  shadow$_klass_ = {Class@4585} "class android.support.v4.view.ViewPager$ItemInfo"
-			  shadow$_monitor_ = -2122299115
-			 2 = {ViewPager$ItemInfo@4715} 
-			  object = {ImageView@4723} "android.widget.ImageView{a89e82 V.ED..... ......ID 0,0-0,0}"
-			  offset = 3.0
-			  position = 3		// 第四个Pager
-			  scrolling = false
-			  widthFactor = 1.0
-			  shadow$_klass_ = {Class@4585} "class android.support.v4.view.ViewPager$ItemInfo"
-			  shadow$_monitor_ = -2061388758
-			 3 = {ViewPager$ItemInfo@4716} 
-			  object = {ImageView@4726} "android.widget.ImageView{81db1c9 V.ED..... ......ID 0,0-0,0}"
-			  offset = 4.0
-			  position = 4		// 第五个Pager
-			  scrolling = false
-			  widthFactor = 1.0
-			  shadow$_klass_ = {Class@4585} "class android.support.v4.view.ViewPager$ItemInfo"
-			  shadow$_monitor_ = -2034585061
-2.将步骤1的四个数据项，根据Item数据中的position，将每个Pager布局到0，1，3，4位置
-3.根据mItems的四个数据项重新布局，然后滚动4个屏幕的距离，当前选中的位置从0变到4
-4.清理掉mItems链表中的0和1两个page对应的数据项，此时mItems中的数据项仅剩下两个元素（position=3和position=4两项）
   
 ```
 
@@ -661,7 +622,7 @@ member variables, mMeasuredWidth and mMeasuredHeight, as the SpecSize value.(Mea
 466             }
 467         }
 468         final boolean dispatchSelected = mCurItem != item;
-			// re
+			
 469         populate(item);
 470         final ItemInfo curInfo = infoForPosition(item);
 471         int destX = 0;
@@ -689,6 +650,52 @@ member variables, mMeasuredWidth and mMeasuredHeight, as the SpecSize value.(Mea
 493             scrollTo(destX, 0);
 494         }
 495     }
+
+
+总结：
+
+![布局变化](https://github.com/lin111000713/custom-RecyclerView/blob/master/%E5%8F%98%E5%8C%96%E8%BF%87%E7%A8%8B.png)
+
+假设当前的ViewPager维护5个Pager，刚开始的时候选择下标为0的pager，然后选中下标为4的pager（setCurrentItem）.Item从0变到4的过程：
+1.当下标从0-->4滚动的过程中，维护的数据链表：mItems（维护四个数据项）
+		mItems = {ArrayList@4681}  size = 4
+			 0 = {ViewPager$ItemInfo@4713} 
+			  object = {ImageView@4717} "android.widget.ImageView{ba43fb8 V.ED..... ........ 0,0-1080,600}"
+			  offset = 0.0
+			  position = 0		// 第一个Pager
+			  scrolling = true
+			  widthFactor = 1.0
+			  shadow$_klass_ = {Class@4585} "class android.support.v4.view.ViewPager$ItemInfo"
+			  shadow$_monitor_ = -1923628340
+			 1 = {ViewPager$ItemInfo@4714} 
+			  object = {ImageView@4720} "android.widget.ImageView{dc854f7 V.ED..... ......ID 1080,0-2160,600}"
+			  offset = 1.0
+			  position = 1		// 第二个Pager
+			  scrolling = true
+			  widthFactor = 1.0
+			  shadow$_klass_ = {Class@4585} "class android.support.v4.view.ViewPager$ItemInfo"
+			  shadow$_monitor_ = -2122299115
+			 2 = {ViewPager$ItemInfo@4715} 
+			  object = {ImageView@4723} "android.widget.ImageView{a89e82 V.ED..... ......ID 0,0-0,0}"
+			  offset = 3.0
+			  position = 3		// 第四个Pager
+			  scrolling = false
+			  widthFactor = 1.0
+			  shadow$_klass_ = {Class@4585} "class android.support.v4.view.ViewPager$ItemInfo"
+			  shadow$_monitor_ = -2061388758
+			 3 = {ViewPager$ItemInfo@4716} 
+			  object = {ImageView@4726} "android.widget.ImageView{81db1c9 V.ED..... ......ID 0,0-0,0}"
+			  offset = 4.0
+			  position = 4		// 第五个Pager
+			  scrolling = false
+			  widthFactor = 1.0
+			  shadow$_klass_ = {Class@4585} "class android.support.v4.view.ViewPager$ItemInfo"
+			  shadow$_monitor_ = -2034585061
+2.将步骤1的四个数据项，根据Item数据中的position，将每个Pager布局到0，1，3，4位置
+3.根据mItems的四个数据项重新布局，然后滚动4个屏幕的距离，当前选中的位置从0变到4
+4.清理掉mItems链表中的0和1两个page对应的数据项，此时mItems中的数据项仅剩下两个元素（position=3和position=4两项）
+
+
 
 ```
 
