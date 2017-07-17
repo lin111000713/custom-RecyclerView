@@ -1,0 +1,2 @@
+改造RecyclerView实现ViewPager功能
+customize RecyclerView to implement ViewPager 
